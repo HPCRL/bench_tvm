@@ -54,7 +54,7 @@ def matmul(N, L, M, dtype):
     cfg.define_split("tile_y", y, num_outputs=3)
     cfg.define_split("tile_x", x, num_outputs=3)
     cfg.define_split("tile_k", k, num_outputs=2)
-    cfg.define_knob("auto_unroll_max_step", [8, 16, 32, 64])
+    cfg.define_knob("auto_unroll_max_step", [0, 512, 1500])
     target = tvm.target.Target.current()
     if target.kind.name in ["nvptx", "rocm"]:
         # llvm-based backends cannot do non-explicit unrolling

@@ -47,15 +47,19 @@ def matmul(N, L, M, dtype):
 
     ##### define space begin #####
     cfg = autotvm.get_config()
-    cfg.define_split("tile_y", y, num_outputs=2)
-    cfg.define_split("tile_x", x, num_outputs=2)
+    cfg.define_split("tile_y", y, num_outputs=3)
+    cfg.define_split("tile_x", x, num_outputs=3)
+    cfg.define_split("tile_k", k, num_outputs=2)
+    cfg.define_knob("auto_unroll_max_step", [0, 512, 1500])
     ##### define space end #####
 
     # schedule according to config
-    yo, yi = cfg["tile_y"].apply(s, C, y)
-    xo, xi = cfg["tile_x"].apply(s, C, x)
-
-    s[C].reorder(yo, xo, k, yi, xi)
+    yo, ym, yi = cfg["tile_y"].apply(s, C, y)
+    xo, xm, xi = cfg["tile_x"].apply(s, C, x)
+    ko, ki = cfg["tile_k"].apply(s, C, k)
+    
+    s[C].reorder(yo, xo, ym, xm, ko, ki, yi, xi)
+    s[C].pragma(ki, "auto_unroll_max_step", cfg["auto_unroll_max_step"].val)
 
     return s, [A, B, C]
 
@@ -169,12 +173,12 @@ def caller_autotvm(specify_pz, ntrials):
         # apply history best from log file
         with autotvm.apply_history_best(log_file):
             with tvm.target.Target(mytarget):
-                s, arg_bufs = matmul(N, L, M, "float32")
+                s, arg_bufs = matmul(M, L, N, "float32")
                 func = tvm.build(s, arg_bufs)
 
         # check correctness
-        a_np = np.random.uniform(size=(N, L)).astype(np.float32)
-        w_np = np.random.uniform(size=(L, M)).astype(np.float32)
+        a_np = np.random.uniform(size=(M, L)).astype(np.float32)
+        w_np = np.random.uniform(size=(L, N)).astype(np.float32)
         c_np = np.matmul(a_np, w_np)
 
         # dev = tvm.cuda()
@@ -185,6 +189,7 @@ def caller_autotvm(specify_pz, ntrials):
         func(a_tvm, w_tvm, c_tvm)
 
         tvm.testing.assert_allclose(c_np, c_tvm.numpy(), rtol=1e-2)
+        print("Correctness est passed", flush=True)
 
 
 if __name__ == '__main__':
