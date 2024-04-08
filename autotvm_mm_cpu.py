@@ -51,6 +51,7 @@ def matmul(N, L, M, dtype):
     cfg.define_split("tile_x", x, num_outputs=3)
     cfg.define_split("tile_k", k, num_outputs=2)
     cfg.define_knob("auto_unroll_max_step", [0, 512, 1500])
+    cfg.define_knob("unroll_explicit", [1])
     ##### define space end #####
 
     # schedule according to config
@@ -60,6 +61,11 @@ def matmul(N, L, M, dtype):
     
     s[C].reorder(yo, xo, ym, xm, ko, ki, yi, xi)
     s[C].pragma(ki, "auto_unroll_max_step", cfg["auto_unroll_max_step"].val)
+    s[C].pragma(ki, "unroll_explicit", cfg["unroll_explicit"].val)
+    s[C].pragma(yi, "auto_unroll_max_step", cfg["auto_unroll_max_step"].val)
+    s[C].pragma(yi, "unroll_explicit", cfg["unroll_explicit"].val)
+    s[C].pragma(xi, "auto_unroll_max_step", cfg["auto_unroll_max_step"].val)
+    s[C].pragma(xi, "unroll_explicit", cfg["unroll_explicit"].val)
 
     return s, [A, B, C]
 
@@ -175,7 +181,10 @@ def caller_autotvm(specify_pz, ntrials):
             with tvm.target.Target(mytarget):
                 s, arg_bufs = matmul(M, L, N, "float32")
                 func = tvm.build(s, arg_bufs)
-
+                fcode = tvm.build(s, arg_bufs, "c")
+                src = fcode.get_source()
+                print("Source: \n", src)
+                
         # check correctness
         a_np = np.random.uniform(size=(M, L)).astype(np.float32)
         w_np = np.random.uniform(size=(L, N)).astype(np.float32)
