@@ -114,35 +114,23 @@ def test_matmul():
         print("Computational DAG:")
         print(task.compute_dag)
 
-        # log_file = "cpu_testCase_" + str(i) +"_matmul_M"+str(M)+"_N"+str(N)+"_K"+str(L)+".json"
-        log_file = "input_full.json"
-        input_file = log_file
-        output_file = "out_" + log_file
+        full_space_input_dir = "cpu_mm_full_space"
+        input_file = os.path.join(full_space_input_dir, f"cpu_mm_testcase_{i}_full_space.json")
+        output_file = os.path.join(full_space_input_dir, f"cpu_mm_testcase_{i}_full_space_output.json")
         
-        start_time = int(time.time())
-        csv_file_path = log_file.replace('.json', '.csv')
-        
-        # write the start time to the csv file
-        with open(csv_file_path, 'w', newline='') as csv_file:
-            csv_file.write(f"start_time:{str(start_time)}\n")
-            
         tune_option = auto_scheduler.TuningOptions(
             num_measure_trials=5,
             runner=auto_scheduler.LocalRunner(repeat=10, enable_cpu_cache_flush=True),
-            measure_callbacks=[auto_scheduler.RecordToFile(log_file)],
+            measure_callbacks=[auto_scheduler.RecordToFile(output_file)],
             verbose=2,
         )
         
-        if not os.path.exists(log_file):
-            task.tune(tune_option)
-            inputs, results = run(input_file, output_file, task)
-            print("inputs", inputs)
-            print("results", results)
+        if not os.path.exists(input_file):
+            raise ValueError("input file does not exist")
         else:
-            print("input file exists")
+            print("input file exists, running...")
             run(task, input_file, output_file)
         
-        exit()
         # # Run auto-tuning (search)
         # task.tune(tune_option)
         # # Apply the best schedule

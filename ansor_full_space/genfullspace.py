@@ -1,6 +1,7 @@
 import json
 import re
 import numpy as np
+import os
 
 def replace_auto_unroll_max_step(input_string, new_value):
     # Replace auto_unroll_max_step with the new value
@@ -80,11 +81,26 @@ def get_factors(x):
         if x % i == 0:
             factor_list.append(i)
     return factor_list
-
 def launch_hyper(M, N, K, fi):
     
-    # only for testcase 0 sketch0
-    json_str = '{"i": [["[\\"_matmul\\", 512, 1024, 64, \\"float32\\"]", "llvm -keys=cpu -mcpu=core-avx2", [16, 64, 64, 0, 0, 0, 0, 0], "", 1, []], [[], [["CHW", 2, "local"], ["SP", 2, 0, 512, [1, 64, 8], 1], ["SP", 2, 4, 64, [2, 32, 1], 1], ["SP", 2, 8, 1024, [16], 1], ["RE", 2, [0, 4, 1, 5, 8, 2, 6, 9, 3, 7]], ["FSP", 3, 0, 1, 2], ["FSP", 3, 3, 2, 2], ["RE", 3, [0, 3, 1, 4, 2, 5]], ["CA", 2, 3, 3], ["FU", 3, [0, 1, 2, 3]], ["AN", 3, 0, 3], ["PR", 2, 0, "auto_unroll_max_step$64"], ["AN", 2, 9, 2], ["AN", 3, 2, 2]]]], "r": [[0.00198047, 0.0019683, 0.00198756, 0.00197635, 0.00198229, 0.00197825, 0.00199231, 0.00198754, 0.001991, 0.00198804], 0, 0.130737, 1714270206], "v": "v0.6"}'
+    # # only for testcase 0 sketch0
+    # json_str = '{"i": [["[\\"_matmul\\", 512, 1024, 64, \\"float32\\"]", "llvm -keys=cpu -mcpu=core-avx2", [16, 64, 64, 0, 0, 0, 0, 0], "", 1, []], [[], [["CHW", 2, "local"], ["SP", 2, 0, 512, [1, 64, 8], 1], ["SP", 2, 4, 64, [2, 32, 1], 1], ["SP", 2, 8, 1024, [16], 1], ["RE", 2, [0, 4, 1, 5, 8, 2, 6, 9, 3, 7]], ["FSP", 3, 0, 1, 2], ["FSP", 3, 3, 2, 2], ["RE", 3, [0, 3, 1, 4, 2, 5]], ["CA", 2, 3, 3], ["FU", 3, [0, 1, 2, 3]], ["AN", 3, 0, 3], ["PR", 2, 0, "auto_unroll_max_step$64"], ["AN", 2, 9, 2], ["AN", 3, 2, 2]]]], "r": [[0.00198047, 0.0019683, 0.00198756, 0.00197635, 0.00198229, 0.00197825, 0.00199231, 0.00198754, 0.001991, 0.00198804], 0, 0.130737, 1714270206], "v": "v0.6"}'
+
+    # ├── sketch_testcase_0.json
+    # ├── sketch_testcase_1.json
+    # ├── sketch_testcase_2.json
+    # ├── sketch_testcase_3.json
+    # ├── sketch_testcase_4.json
+    # └── sketch_testcase_5.json
+    sketch_idx = 2
+    sketch_dir = "cpu_mm_sketches"
+    sketch_file = f"sketch_testcase_{fi}.json"
+    with open(os.path.join(sketch_dir, sketch_file), 'r') as file:
+        sketches = file.readlines()
+
+    # use sketches
+    print(f"sketches[{sketch_idx}]:", sketches[sketch_idx])
+    json_str = sketches[sketch_idx]
 
     factors_M = get_factors(M)
     factors_N = get_factors(N)
@@ -92,6 +108,11 @@ def launch_hyper(M, N, K, fi):
     print(f"size: {M}x{N}x{K}, factors_M: {factors_M}, factors_N: {factors_N}, factors_K: {factors_K}")
     print(f"size of factors_M: {len(factors_M)}, size of factors_N: {len(factors_N)}, size of factors_K: {len(factors_K)}")
     
+    output_dir = "cpu_mm_full_space"
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    output_file = os.path.join(output_dir, f"cpu_mm_testcase_{fi}_full_space.json")
+
     configs = []
     length = 0
     for y1 in factors_M:
@@ -110,7 +131,7 @@ def launch_hyper(M, N, K, fi):
                                     )
                                     if tile_list:
                                         modified_json_str = process_json(json_str, tile_list)
-                                        with open('input_full.json', 'a') as file:
+                                        with open(output_file, 'a') as file:
                                             file.write(modified_json_str + '\n')
                                         # print("tile_list:", tile_list)
                                         # input("pause")
